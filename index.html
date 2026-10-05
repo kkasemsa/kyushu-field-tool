@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kyushu Field Tool v1.2</title>
+<title>Kyushu Field Tool v1.3</title>
 <meta name="theme-color" content="#1b2440">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -106,6 +106,27 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .win.done{opacity:.5}
 .sunline{display:flex;justify-content:space-between;gap:8px;margin-top:8px;padding:8px 2px 0;border-top:1px dashed var(--line);font-size:14px}
 .sunline b{font-size:17px}
+/* compass / weather / departure */
+.dialhead{display:flex;align-items:center;gap:8px}
+.dialhead h2{margin:0;flex:1}
+.hdg{font-size:13px;color:var(--mute);min-height:18px;text-align:center;margin-top:4px}
+.hdg b{color:var(--ink);font-size:15px}
+.wx{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:560px){.wx{grid-template-columns:1fr 1fr}}
+.wxc{border-radius:10px;padding:9px 10px;background:var(--panel2)}
+.wxc .k{font-size:12px;color:var(--mute)}
+.wxc .v{font-size:20px;font-weight:700;line-height:1.2}
+.wxc .s{font-size:12px;color:var(--mute);line-height:1.35}
+.wxc.good{background:color-mix(in srgb,var(--ok) 16%,var(--panel2))}
+.wxc.mid{background:color-mix(in srgb,var(--gold) 20%,var(--panel2))}
+.wxc.bad{background:color-mix(in srgb,var(--mute) 22%,var(--panel2))}
+.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:12px;font-weight:600;background:var(--panel);margin-top:3px}
+.dep{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+@media (max-width:560px){.dep{grid-template-columns:1fr 1fr}}
+.depout{display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--panel2)}
+.depout .big{font-size:34px;font-weight:700;line-height:1.1}
+.depout .k{font-size:12px;color:var(--mute)}
+.scenes{display:flex;flex-wrap:wrap;gap:6px}
 /* ribbon */
 .ribbon{position:relative}
 .ribbon svg{display:block;width:100%;height:auto}
@@ -178,7 +199,7 @@ table.trip td.spot small{display:block;color:var(--mute);font-size:12px}
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>Kyushu Field Tool</h1><span class="ver">v1.2</span><span class="ver" id="offl"></span>
+    <h1>Kyushu Field Tool</h1><span class="ver">v1.3</span><span class="ver" id="offl"></span>
     <span class="sp"></span>
     <button class="iconbtn" id="nightBtn" aria-pressed="false" title="โหมดแสงแดง ถนอมสายตาตอนถ่ายดาว">🔴 โหมดกลางคืน</button>
   </header>
@@ -212,6 +233,23 @@ table.trip td.spot small{display:block;color:var(--mute);font-size:12px}
 
     <div class="wins" id="wins"></div>
 
+    <div class="card" id="wxcard">
+      <div class="dialhead"><h2>เมฆและลมช่วงแสง</h2><button class="sbtn" id="wxBtn">อัปเดตพยากรณ์</button></div>
+      <div id="wx"></div>
+      <p class="note" id="wxnote"></p>
+    </div>
+
+    <div class="card">
+      <h2>ต้องออกจากที่พักกี่โมง</h2>
+      <div class="dep">
+        <label class="field"><span>อยากถึงก่อน</span><select id="depEv"></select></label>
+        <label class="field"><span>ล่วงหน้า (นาที)</span><input type="number" id="depLead" value="30" min="0" step="5"></label>
+        <label class="field"><span>เวลาเดินทาง (นาที)</span><input type="number" id="depDrive" value="45" min="0" step="5"></label>
+        <label class="field"><span>เผื่อหาที่จอด/เดิน (นาที)</span><input type="number" id="depBuf" value="10" min="0" step="5"></label>
+      </div>
+      <div class="depout" id="depOut"></div>
+    </div>
+
     <div class="card ribbon">
       <h2 id="ribbonTitle">แสงตลอดวัน</h2>
       <div id="ribbon"></div>
@@ -229,8 +267,9 @@ table.trip td.spot small{display:block;color:var(--mute);font-size:12px}
 
     <div class="duo">
       <div class="card dial">
-        <h2>ทิศดวงอาทิตย์และดวงจันทร์</h2>
+        <div class="dialhead"><h2>ทิศดวงอาทิตย์และดวงจันทร์</h2><button class="sbtn" id="cmpBtn" aria-pressed="false">🧭 เข็มทิศ</button></div>
         <div id="dial"></div>
+        <div class="hdg" id="hdg"></div>
         <div class="dialinfo" id="dialinfo"></div>
         <p class="note">วงนอกคือขอบฟ้า จุดกลางคือเหนือศีรษะ เส้นทึบคือเส้นทางดวงอาทิตย์ เส้นประคือดวงจันทร์ ทิศเหนืออยู่ด้านบน</p>
       </div>
@@ -259,6 +298,20 @@ table.trip td.spot small{display:block;color:var(--mute);font-size:12px}
 
   <!-- ================= EXPOSURE ================= -->
   <section class="view" id="v-expo">
+    <div class="card">
+      <h2>อยากได้ฉากแบบไหน → ต้องใช้ ND เท่าไร</h2>
+      <div class="grid3">
+        <label class="field"><span>ค่าที่กล้องวัดได้ตอนนี้</span><select id="scBase"></select></label>
+        <label class="field"><span>รูรับแสง</span><select id="scF"></select></label>
+        <label class="field"><span>ISO</span><select id="scIso"></select></label>
+      </div>
+      <h3>ฉาก</h3>
+      <div class="scenes" id="scenes"></div>
+      <h3>ฟิลเตอร์ที่พกไป</h3>
+      <div class="ndchips" id="scOwn"></div>
+      <div class="result" id="scOut"></div>
+    </div>
+
     <div class="card">
       <h2>ND และเทียบค่าแสง</h2>
       <div class="grid3">
@@ -497,9 +550,27 @@ function renderRibbon(){
   s+="</svg>";$("ribbon").innerHTML=s;$("tout").textContent=hm(TSEL);
   $("ribbonTitle").textContent=`แสงตลอดวัน · ${C.loc.name}`;
 }
+/* ===== compass ===== */
+let cmpOn=false,cmpHdg=null,cmpRaf=0;
+function onOrient(e){let h=null;if(typeof e.webkitCompassHeading==="number")h=e.webkitCompassHeading;else if(e.absolute&&typeof e.alpha==="number")h=(360-e.alpha)%360;
+  if(h==null)return;cmpHdg=h;if(!cmpRaf)cmpRaf=requestAnimationFrame(()=>{cmpRaf=0;applyHeading();});}
+function applyHeading(){const g=document.getElementById("dialRot");if(!g||cmpHdg==null)return;g.setAttribute("transform",`rotate(${(-cmpHdg).toFixed(1)} 170 170)`);
+  const i=Math.round(TSEL),tgt=C.sun[i]>-0.833?C.sunAz[i]:(E.sunset!=null?azAt(C.sunAz,E.sunset):null);
+  let d="";if(tgt!=null){let diff=((tgt-cmpHdg+540)%360)-180;d=` · ${C.sun[i]>-0.833?"ดวงอาทิตย์":"จุดตะวันตก"}อยู่${Math.abs(diff)<4?"ตรงหน้า":`ทาง${diff>0?"ขวา":"ซ้าย"} ${Math.abs(Math.round(diff))}°`}`;}
+  $("hdg").innerHTML=`หันไปทาง <b>${Math.round(cmpHdg)}° ${DIR16[Math.round(cmpHdg/22.5)%16]}</b>${d}`;}
+async function toggleCompass(){
+  if(cmpOn){cmpOn=false;window.removeEventListener("deviceorientation",onOrient,true);window.removeEventListener("deviceorientationabsolute",onOrient,true);$("cmpBtn").setAttribute("aria-pressed","false");$("hdg").textContent="";cmpHdg=null;renderDial();return;}
+  try{if(window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==="function"){const r=await DeviceOrientationEvent.requestPermission();if(r!=="granted"){$("hdg").textContent="ไม่ได้รับอนุญาตให้ใช้เข็มทิศ";return;}}}
+  catch(e){$("hdg").textContent="เข็มทิศใช้ไม่ได้บนหน้านี้ (ต้องเปิดจากแอปที่ติดตั้งหรือ Safari โดยตรง)";return;}
+  cmpOn=true;$("cmpBtn").setAttribute("aria-pressed","true");$("hdg").textContent="กำลังอ่านเข็มทิศ… ถือโทรศัพท์แนวนอนแล้วขยับเป็นเลข 8 ถ้าค่ายังนิ่ง";
+  window.addEventListener("deviceorientationabsolute",onOrient,true);window.addEventListener("deviceorientation",onOrient,true);
+}
+$("cmpBtn").onclick=toggleCompass;
 function renderDial(){
   const R=150,cx=170,cy=170,P=(az,alt)=>{const r=R*(1-Math.max(0,alt)/90),a=(az-90)*rad;return [cx+r*Math.cos(a),cy+r*Math.sin(a)];};
   let s=`<svg viewBox="0 0 340 340" role="img" aria-label="แผนภาพทิศดวงอาทิตย์และดวงจันทร์">`;
+  if(cmpOn)s+=`<path d="M170,4 L160,20 L180,20 Z" fill="var(--hot)"/>`;
+  s+=`<g id="dialRot" transform="rotate(${cmpHdg!=null?(-cmpHdg).toFixed(1):0} 170 170)">`;
   s+=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="var(--panel2)" stroke="var(--line)" stroke-width="1.5"/>`;
   for(const a of [30,60])s+=`<circle cx="${cx}" cy="${cy}" r="${R*(1-a/90)}" fill="none" stroke="var(--line)" stroke-dasharray="2 4"/>`;
   for(let az=0;az<360;az+=15){const [x1,y1]=P(az,0),r2=az%45===0?R-10:R-5,a=(az-90)*rad;s+=`<line x1="${x1}" y1="${y1}" x2="${cx+r2*Math.cos(a)}" y2="${cy+r2*Math.sin(a)}" stroke="var(--mute)" stroke-width="${az%90===0?2:1}"/>`;}
@@ -517,7 +588,7 @@ function renderDial(){
   const i=Math.round(TSEL),sa=C.sun[i],ma=C.moon[i];
   const body=(alt,az,fill,r,lbl)=>{const [x,y]=P(az,alt);const below=alt<=0;return `<circle cx="${x}" cy="${y}" r="${r}" fill="${below?"none":fill}" stroke="${fill}" stroke-width="2.5" ${below?'stroke-dasharray="3 3"':""}/>`+(below?`<text x="${x}" y="${y+r+12}" font-size="10" text-anchor="middle" fill="var(--mute)">${lbl} ใต้ขอบฟ้า</text>`:"");};
   s+=body(ma,C.moonAz[i],"var(--moon)",8,"จันทร์")+body(sa,C.sunAz[i],"var(--gold)",11,"แดด");
-  s+="</svg>";$("dial").innerHTML=s;
+  s+="</g></svg>";$("dial").innerHTML=s;if(cmpOn)applyHeading();
   const il=E.illumNow(TSEL);
   $("dialinfo").innerHTML=`<div class="stat"><div class="k">ดวงอาทิตย์ ${hm(TSEL)}</div><div class="v">${sa>-0.833?Math.round(C.sunAz[i])+"°":"ใต้ขอบฟ้า"}</div><div class="s">${sa>-0.833?`สูง ${sa.toFixed(1)}° · ${dirName(C.sunAz[i]).split(" · ")[1]}`:`ต่ำกว่าขอบฟ้า ${(-sa).toFixed(1)}°`}</div></div>
    <div class="stat"><div class="k">ดวงจันทร์ ${hm(TSEL)}</div><div class="v">${ma>0?Math.round(C.moonAz[i])+"°":"ใต้ขอบฟ้า"}</div><div class="s">${ma>0?`สูง ${ma.toFixed(1)}° · สว่าง ${Math.round(il.fraction*100)}%`:`สว่าง ${Math.round(il.fraction*100)}%`}</div></div>`;
@@ -583,7 +654,66 @@ function renderWins(){
   $("wins").querySelectorAll(".win[data-t]").forEach(b=>b.onclick=()=>{TSEL=+b.dataset.t;$("tmin").value=TSEL;renderRibbon();renderDial();
     $("ribbon").scrollIntoView({block:"nearest",behavior:"smooth"});});
 }
-function render(){renderWins();renderRibbon();renderDial();renderEvents();renderMoon();}
+/* ===== weather (Open-Meteo) ===== */
+const WX={};
+function wxKey(){const l=curLoc();return `wx:${l.lat.toFixed(2)},${l.lon.toFixed(2)}`;}
+function wxLoad(){try{return JSON.parse(localStorage.getItem(wxKey())||"null");}catch(e){return null;}}
+async function wxFetch(force){
+  const l=curLoc(),key=wxKey(),cached=wxLoad();
+  if(!force&&cached&&Date.now()-cached.at<3*36e5){WX[key]=cached;return cached;}
+  const tzn=l.tz===9?"Asia/Tokyo":l.tz===7?"Asia/Bangkok":"auto";
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${l.lat}&longitude=${l.lon}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,cloud_cover,cloud_cover_low,visibility,wind_speed_10m&timezone=${encodeURIComponent(tzn)}&forecast_days=16`;
+  const r=await fetch(url);if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();
+  const d={at:Date.now(),t:j.hourly.time,cc:j.hourly.cloud_cover,cl:j.hourly.cloud_cover_low,pp:j.hourly.precipitation_probability,vis:j.hourly.visibility,ws:j.hourly.wind_speed_10m,tp:j.hourly.temperature_2m,rh:j.hourly.relative_humidity_2m};
+  WX[key]=d;try{localStorage.setItem(key,JSON.stringify(d));}catch(e){}return d;
+}
+function wxAt(d,minute){ // minute of day on ST.date (may exceed 1440)
+  const dayMin=Math.floor(minute/60);const base=d.t.indexOf(ST.date+"T00:00");if(base<0)return null;
+  const i=base+dayMin;if(i>=d.t.length)return null;const f=minute/60-dayMin,j=Math.min(d.t.length-1,i+1);
+  const g=k=>d[k][i]==null?null:(d[k][j]==null?d[k][i]:d[k][i]*(1-f)+d[k][j]*f);
+  return {cc:g("cc"),cl:g("cl"),pp:g("pp"),vis:g("vis"),ws:g("ws"),tp:g("tp"),rh:g("rh")};
+}
+function wxVerdict(w){if(w.cc==null)return ["","—"];if(w.pp>=50)return["bad","ฝน"];if(w.cc<30)return["good","ฟ้าเปิด"];if(w.cc<=70)return["mid","เมฆบางส่วน"];if(w.cl<40)return["mid","เมฆสูง"];return["bad","ครึ้ม"];}
+function renderWx(){
+  const box=$("wx"),note=$("wxnote"),d=WX[wxKey()]||wxLoad();
+  const inRange=d&&d.t.indexOf(ST.date+"T00:00")>=0;
+  if(!d){box.innerHTML=`<p class="small muted" style="margin:0">ยังไม่มีพยากรณ์ของจุดนี้ กด "อัปเดตพยากรณ์" ตอนมีเน็ต (พยากรณ์ล่วงหน้าได้ 16 วัน)</p>`;note.textContent="";return;}
+  if(!inRange){box.innerHTML=`<p class="small muted" style="margin:0">วันที่เลือกอยู่นอกช่วงพยากรณ์ 16 วัน (มีข้อมูล ${d.t[0].slice(0,10)} ถึง ${d.t[d.t.length-1].slice(0,10)})</p>`;note.textContent="";return;}
+  const wins=[["Blue hour เช้า",E.blueAmS,E.blueAmE],["Golden hour เช้า",E.blueAmE,E.goldAmE],["Golden hour เย็น",E.goldPmS,E.bluePmS],["Blue hour เย็น",E.bluePmS,E.bluePmE]];
+  let h="";
+  for(const [n,a,b] of wins){if(a==null||b==null)continue;const w=wxAt(d,(a+b)/2);if(!w){continue;}const [cls,v]=wxVerdict(w);
+    h+=`<div class="wxc ${cls}"><div class="k">${n} ${hm(a).slice(0,5)}</div><div class="v">${Math.round(w.cc)}%<span style="font-size:12px;font-weight:500"> เมฆ</span></div>
+      <div class="s">เมฆต่ำ ${Math.round(w.cl)}% · ฝน ${Math.round(w.pp)}%<br>ลม ${Math.round(w.ws)} km/h · มอง ${w.vis!=null?(w.vis/1000).toFixed(0)+" km":"—"}</div><span class="tag">${v}</span></div>`;}
+  // morning fog heuristic at sunrise
+  let fog="";if(E.sunrise!=null){const w=wxAt(d,E.sunrise);if(w&&w.cc!=null){const sc=(w.rh>=92?2:w.rh>=85?1:0)+(w.ws<=8?1:0)+(w.cl<30?1:0)+(w.pp<20?1:0);
+    fog=`หมอกเช้า (ประเมินคร่าวๆ จากความชื้น ${Math.round(w.rh)}% ลม ${Math.round(w.ws)} km/h ฟ้า${w.cl<30?"โล่ง":"มีเมฆ"}): <b>${sc>=4?"โอกาสสูง":sc>=3?"ปานกลาง":"ต่ำ"}</b> · อุณหภูมิ ${Math.round(w.tp)}°C`;}}
+  box.innerHTML=`<div class="wx">${h}</div>`+(fog?`<p class="small" style="margin:10px 0 0">${fog}</p>`:"");
+  const age=(Date.now()-d.at)/36e5,days=Math.round((localMidnightUTC(ST.date,curLoc().tz)-localMidnightUTC(todayIn(curLoc().tz),curLoc().tz))/dayMs);
+  note.textContent=`ข้อมูล Open-Meteo อัปเดตเมื่อ ${age<1?"ไม่ถึงชั่วโมง":Math.round(age)+" ชม."}ที่แล้ว${days>3?` · พยากรณ์ล่วงหน้า ${days} วัน ความแม่นยำต่ำ ควรเช็กใหม่ใน 1–2 วันก่อนถึง`:""}`;
+}
+$("wxBtn").onclick=async()=>{$("wxBtn").disabled=true;$("wxnote").textContent="กำลังดึงพยากรณ์…";
+  try{await wxFetch(true);renderWx();}catch(e){$("wxnote").textContent="ดึงไม่ได้: "+(navigator.onLine?"หน้านี้อาจถูกบล็อกไม่ให้เรียกข้อมูลภายนอก (ใช้จากแอปที่ติดตั้ง) หรือเซิร์ฟเวอร์ไม่ตอบ":"ไม่มีอินเทอร์เน็ต");renderWxKeep();}
+  $("wxBtn").disabled=false;};
+function renderWxKeep(){const t=$("wxnote").textContent;renderWx();if(t&&!$("wx").querySelector(".wxc"))$("wxnote").textContent=t;}
+async function wxAuto(){if(!navigator.onLine)return;const c=wxLoad();if(c&&Date.now()-c.at<3*36e5)return;try{await wxFetch(false);renderWx();}catch(e){}}
+
+/* ===== departure planner ===== */
+const DEPEV=[["sunrise","พระอาทิตย์ขึ้น"],["blueAmS","Blue hour เช้าเริ่ม"],["blueAmE","Golden hour เช้าเริ่ม"],["goldPmS","Golden hour เย็นเริ่ม"],["sunset","พระอาทิตย์ตก"],["bluePmS","Blue hour เย็นเริ่ม"],["astroDusk","ฟ้ามืดสนิท"],["moonrise","ดวงจันทร์ขึ้น"]];
+function renderDep(){
+  const sel=$("depEv");if(!sel.options.length){sel.innerHTML=DEPEV.map(([k,n])=>`<option value="${k}">${n}</option>`).join("");sel.value=ST.dep?.ev||"sunrise";$("depLead").value=ST.dep?.lead??30;$("depDrive").value=ST.dep?.drive??45;$("depBuf").value=ST.dep?.buf??10;}
+  const ev=E[sel.value],lead=+$("depLead").value||0,drive=+$("depDrive").value||0,buf=+$("depBuf").value||0;
+  if(ev==null){$("depOut").innerHTML=`<span class="muted">วันนี้ไม่มีเหตุการณ์นี้</span>`;return;}
+  const arrive=ev-lead,leave=arrive-drive-buf;
+  const isToday=todayIn(C.loc.tz)===ST.date,nm=nowMin(C.loc.tz);
+  $("depOut").innerHTML=`<div><div class="k">ออกจากที่พัก</div><div class="big">${hm(leave<0?leave+1440:leave)}${leave<0?' <span class="k">(คืนก่อน)</span>':""}</div></div>
+    <div><div class="k">ถึงที่หมาย</div><div class="big" style="font-size:24px">${hm(arrive)}</div></div>
+    <div><div class="k">${DEPEV.find(x=>x[0]===sel.value)[1]}</div><div class="big" style="font-size:24px">${hm(ev)}</div></div>
+    ${isToday&&leave>nm?`<div class="k">อีก ${dur(leave-nm)} ต้องออก</div>`:""}`;
+  ST.dep={ev:sel.value,lead,drive,buf};save();
+}
+["depEv","depLead","depDrive","depBuf"].forEach(id=>$(id).addEventListener("input",renderDep));
+
+function render(){renderWins();renderRibbon();renderDial();renderEvents();renderMoon();renderDep();renderWx();wxAuto();}
 
 /* ================= trip view ================= */
 function renderTrip(){
@@ -633,7 +763,34 @@ function buildExpo(){
   ["dofF","dofN","dofS"].forEach(id=>$(id).addEventListener("input",calcDoF));
   ["npfF","npfN","npfDec","npfTol"].forEach(id=>$(id).addEventListener("input",calcNPF));
   ["tlInt","tlLen","tlFps"].forEach(id=>$(id).addEventListener("input",calcTL));
-  calcND();calcDoF();calcNPF();calcTL();
+  calcND();calcDoF();calcNPF();calcTL();buildScenes();
+}
+/* ===== scene → ND ===== */
+const SCENES=[["น้ำไหลนุ่ม",1,"น้ำตก Manai, ลำธาร"],["น้ำเป็นผ้าไหม",4,"ทะเล Futamigaura, น้ำตกเต็มเฟรม"],["ไอน้ำยังเห็นเป็นริ้ว",0.5,"Kannawa, Unzen Jigoku"],["ไอน้ำฟุ้งนุ่ม",2,"บ่อนรก Beppu"],["เมฆไหลเป็นเส้น",30,"Daikanbo, ฟ้าใหญ่"],["คนหายจากภาพ",60,"Dazaifu, Glover Garden"],["ไฟรถเป็นเส้น",8,"Nakasu, Tenjin"]];
+let scSel=1,scOwn=new Set([3,6,10,1.5]);
+function buildScenes(){
+  $("scBase").innerHTML=opt(SHUTTERS,fmtShutter,1/250);$("scF").innerHTML=opt(FSTOPS,v=>"f/"+v,8);$("scIso").innerHTML=opt(ISOS,v=>"ISO "+v,100);
+  $("scenes").innerHTML=SCENES.map((sc,i)=>`<button class="chip" data-i="${i}" aria-pressed="${i===scSel}" title="${sc[2]}">${sc[0]} <span class="muted">${fmtShutter(sc[1])}</span></button>`).join("");
+  $("scenes").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{scSel=+b.dataset.i;$("scenes").querySelectorAll(".chip").forEach(x=>x.setAttribute("aria-pressed",x===b));calcScene();});
+  $("scOwn").innerHTML=NDS.map(([n,s])=>`<button class="chip" data-s="${s}" aria-pressed="${scOwn.has(s)}">${n}</button>`).join("");
+  $("scOwn").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{const v=+b.dataset.s;scOwn.has(v)?scOwn.delete(v):scOwn.add(v);b.setAttribute("aria-pressed",scOwn.has(v));calcScene();});
+  ["scBase","scF","scIso"].forEach(id=>$(id).addEventListener("input",calcScene));calcScene();
+}
+function calcScene(){
+  const base=+$("scBase").value,f=+$("scF").value,iso=+$("scIso").value,sc=SCENES[scSel],target=sc[1];
+  const need=Math.log2(target/base);
+  if(need<=0.3){$("scOut").innerHTML=`<div class="big">ไม่ต้องใส่ ND</div><div class="sub">ตั้ง ${fmtShutter(target)} ได้เลย${need<0?` แล้วลด ISO หรือเปิดรูรับแสงเพิ่ม ${(-need).toFixed(1)} stop`:""}</div>`;return;}
+  const own=NDS.filter(([n,s])=>scOwn.has(s));let best=null;
+  for(let m=1;m<(1<<own.length);m++){const set=own.filter((_,k)=>m&(1<<k)),st=set.reduce((a,[,s])=>a+s,0);if(st<=need+0.4&&(!best||st>best.st||(st===best.st&&set.length<best.set.length)))best={set,st};}
+  let h="";
+  if(!best){h=`<div class="big">ต้องลดแสง ${need.toFixed(1)} stop</div><div class="sub">ไม่มีฟิลเตอร์ที่ใส่แล้วไม่เกิน ลองหรี่รูรับแสงหรือรอแสงลดก่อน</div>`;}
+  else{const rest=need-best.st,got=base*Math.pow(2,best.st);
+    h=`<div class="big">${best.set.map(x=>x[0]).join(" + ")}</div><div class="sub">ลดแสง ${best.st.toFixed(1)} จาก ${need.toFixed(1)} stop ที่ต้องการ → ได้ ${fmtShutter(got)} ที่ f/${f} ISO ${iso}</div>`;
+    if(rest>0.3){const fNew=f*Math.pow(2,rest/2),fN=FSTOPS.find(v=>v>=fNew-0.01)||FSTOPS[FSTOPS.length-1],isoNew=ISOS.slice().reverse().find(v=>v<=iso/Math.pow(2,rest));
+      h+=`<div class="sub" style="margin-top:6px">ยังขาดอีก ${rest.toFixed(1)} stop: หรี่เป็น <b>f/${fN}</b>${isoNew&&isoNew<iso?` หรือลด ISO เป็น <b>${isoNew}</b>`:""} จะได้ครบ ${fmtShutter(target)}</div>`;}
+    if(got>30)h+=`<div class="sub">เกิน 30 วิ ใช้ Bulb · <button class="sbtn" id="scTimer">จับเวลา ${fmtMS(got)}</button></div>`;}
+  h+=`<div class="sub" style="margin-top:6px">${sc[2]}</div>`;
+  $("scOut").innerHTML=h;const b=$("scTimer");if(b)b.onclick=()=>openTimer(base*Math.pow(2,best.st),sc[0]);
 }
 function calcND(){
   const base=+$("ndBase").value,fA=+$("fA").value,fB=+$("fB").value,iA=+$("isoA").value,iB=+$("isoB").value;
